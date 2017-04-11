@@ -444,7 +444,7 @@ def main(PY3):
                 historyImg = numpy.bitwise_or(bwImg, historyImg)                    
             # Threshold to trigger motion
             
-            print("motion percent: " + motionPercent)
+            print("motion percent: " + str(motionPercent))
             
             if motionPercent > config.startThreshold or (recording and motionPercent >= config.stopThreshold):
                 #if motionPercent >= config.maxChange:
