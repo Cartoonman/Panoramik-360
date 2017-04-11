@@ -46,7 +46,7 @@ def takePicture():
 
     
     # find the last picture taken. Modify to parse for date or other
-    files = []
+    """files = []
     listFiles = subprocess.Popen(["ptpcam", "-L"], stdout=subprocess.PIPE)
     for line in listFiles.stdout.readlines():
         files.append(line.rstrip())
@@ -70,8 +70,8 @@ def takePicture():
     if filename == "":
     	return
     print ("Uploading")
-
-    upload_result(r, filename)
+    """
+    upload_result(r, "R0010001.JPG")
     
     
 if __name__ == '__main__':

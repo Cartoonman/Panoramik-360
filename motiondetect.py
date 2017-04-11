@@ -26,7 +26,7 @@ sys.argv[1] = configuration file name or will default to "motiondetect.ini" if n
 
 """
 
-import configparser, logging, sys, os, time, datetime, threading, numpy, cv2, urllib.parse, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis
+import configparser, logging, sys, os, time, datetime, threading, numpy, cv2, urlparse, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis
 
 frameOk = True
 
@@ -289,7 +289,7 @@ def main():
     config(parser)
     
     # See if we have MJPEG stream
-    mjpeg = urllib.parse.urlparse(config.url).scheme == "http"
+    mjpeg = urlparse.urlparse(config.url).scheme == "http"
     # Initialize video
     if mjpeg:
         frameWidth, frameHeight = initMjpegVideo(config.url, config.socketTimeout)
