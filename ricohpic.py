@@ -41,11 +41,9 @@ def takePicture():
     #    print(line.rstrip())
 
 
-<<<<<<< HEAD
-    #time.sleep(5)
-=======
+
     time.sleep(1)
->>>>>>> 2151063c6ade17ca08dc90d2693a9bf746b3ca0a
+
     
     # find the last picture taken. Modify to parse for date or other
     files = []
@@ -66,16 +64,13 @@ def takePicture():
     match = p.search(k)
     if match is not None:
         filename = match.group(1) 
-<<<<<<< HEAD
+
         
         
     if filename == "":
     	return
     print ("Uploading")
-=======
-    
-    print("Uploading File")
->>>>>>> 2151063c6ade17ca08dc90d2693a9bf746b3ca0a
+
     upload_result(r, filename)
     
     
