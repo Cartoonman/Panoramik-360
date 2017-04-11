@@ -26,7 +26,7 @@ sys.argv[1] = configuration file name or will default to "motiondetect.ini" if n
 
 """
 
-import ConfigParser, logging, sys, os, time, datetime, threading, numpy, cv2, urlparse, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis
+import logging, sys, os, time, datetime, threading, numpy, cv2, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis
 
 frameOk = True
 
@@ -269,13 +269,17 @@ def config(parser):
     config.timeout = parser.getint("scp", "timeout")
     config.deleteSource = parser.getboolean("scp", "deleteSource")
 
-def main():
+def main(PY3):
     """Main function"""
     if len(sys.argv) < 2:
         configFileName = "motiondetect.ini"
     else:
         configFileName = sys.argv[1]
-    parser = ConfigParser.SafeConfigParser()
+    parser = None
+    if PY3:
+        parser = configparser.SafeConfigParser()
+    else: 
+        parser = ConfigParser.SafeConfigParser()
     # Read configuration file
     parser.read(configFileName)
     # Configure logger
@@ -289,7 +293,12 @@ def main():
     config(parser)
     
     # See if we have MJPEG stream
-    mjpeg = urlparse.urlparse(config.url).scheme == "http"
+    mjpeg = None
+    if PY3:
+        mjpeg = urllib.parse.urlparse(config.url).scheme == "http"
+    else:
+        mjpeg = urlparse.urlparse(config.url).scheme == "http"
+    
     # Initialize video
     if mjpeg:
         print ("Waiting for initial frame...")
@@ -551,4 +560,19 @@ def main():
             cv2.imwrite("%s/%s.png" % (fileDir, fileName), cv2.bitwise_not(historyImg))
 
 if __name__ == '__main__':
-    main()
+    import sys    
+    # prints whether python is version 3 or not
+    python_version = sys.version_info.major
+    PY3 = True
+    if python_version == 3:
+        print("is python 3")
+        import configparser
+        import urllib.parse
+    else:
+        print("not python 3")
+        import ConfigParser
+        import urlparse
+        PY3 = False
+
+
+    main(PY3)
