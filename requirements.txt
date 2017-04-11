@@ -7,6 +7,7 @@ itsdangerous==0.24
 Jinja2==2.9.5  
 MarkupSafe==0.23  
 packaging==16.8  
+numpy==1.12.1
 requests==2.13.0  
 Werkzeug==0.11.15
 Pillow==4.0.0
