@@ -1,5 +1,4 @@
 import cv2
-import ricohpic
 import time
 import boto3
 import os
