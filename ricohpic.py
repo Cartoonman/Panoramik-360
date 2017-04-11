@@ -40,7 +40,7 @@ def takePicture():
     #    print(line.rstrip())
 
 
-    time.sleep(5)
+    time.sleep(1)
     
     # find the last picture taken. Modify to parse for date or other
     files = []
@@ -62,6 +62,7 @@ def takePicture():
     if match is not None:
         filename = match.group(1) 
     
+    print("Uploading File")
     upload_result(r, filename)
     
     

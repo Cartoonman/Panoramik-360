@@ -359,25 +359,25 @@ def main():
                 )
                 
         thread.start()
-        
-        # Wait until buffer is full
-        while(len(frameBuf) < fps):
-            # 1/4 of FPS sleep
-            print(len(frameBuf))
-            time.sleep(3)              
-        start = time.time()
-        appstart = start
-        print (appstart)
-        
-        #^ bullshit.
         r = redis.from_url(os.environ.get("REDIS_URL"))
         r.set('det_status', 'GO')
+        # Wait until buffer is full
+        while((len(frameBuf) < fps) and (r.get('det_status').decode('utf-8') == 'GO')):
+            # 1/4 of FPS sleep
+            print(len(frameBuf))
+            time.sleep(1)              
+        start = time.time()
+        appstart = start
+        
+        
+        
+        
         # Loop as long as there are frames in the buffer
         while(r.get('det_status').decode('utf-8') == 'GO'):
             # Wait until frame buffer is full
-            while(len(frameBuf) < fps):
+            while((len(frameBuf)) < fps and (r.get('det_status').decode('utf-8') == 'GO')):
                 # 1/4 of FPS sleep
-                time.sleep(3)
+                time.sleep(1)
                 
             # Get oldest frame
             frame = frameBuf[0][0]
@@ -458,6 +458,9 @@ def main():
                 if config.mark:
                     # Draw rectangle around found objects
                     markRectSize(frame, movementLocations, widthMultiplier, heightMultiplier, (0, 255, 0), 2)
+                if config.saveFrames:
+                    thread = threading.Thread(target=saveFrame, args=(frame, "%s/new-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % recFrameNum,))
+                    thread.start()
                 # Detect pedestrians ?
                 if config.detectType.lower() == "p":
                     locationsList, foundLocationsList, foundWeightsList = pedestriandet.detect(movementLocations, resizeImg, config.winStride, config.padding, config.scale0)
@@ -528,8 +531,7 @@ def main():
         frameOk = False
         # Clean up
         if mjpeg:
-            socketFile.close()
-            streamSock.close()
+            pass
         else:
             del videoCapture
         if config.historyImage and fileDir is not None:
