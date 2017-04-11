@@ -28,8 +28,8 @@ def takePicture():
 
     r = redis.from_url(os.environ.get("REDIS_URL"))
     
-    #p = subprocess.Popen(["ptpcam", "-R", "0x100e"])
-    #time.sleep(5)
+    p = subprocess.Popen(["ptpcam", "-R", "0x100e"])
+    time.sleep(5)
     #p.kill()
     # example of grabbing device info and using it in your python program.
     #ptpinfo = subprocess.Popen(["ptpcam", "--info"], stdout=subprocess.PIPE)
@@ -46,7 +46,7 @@ def takePicture():
 
     
     # find the last picture taken. Modify to parse for date or other
-    """files = []
+    files = []
     listFiles = subprocess.Popen(["ptpcam", "-L"], stdout=subprocess.PIPE)
     for line in listFiles.stdout.readlines():
         files.append(line.rstrip())
@@ -70,8 +70,8 @@ def takePicture():
     if filename == "":
     	return
     print ("Uploading")
-    """
-    upload_result(r, "R0010001.JPG")
+    
+    upload_result(r,  filename)
     
     
 if __name__ == '__main__':

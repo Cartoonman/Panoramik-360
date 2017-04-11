@@ -26,9 +26,16 @@ sys.argv[1] = configuration file name or will default to "motiondetect.ini" if n
 
 """
 
-import logging, sys, os, time, datetime, threading, numpy, cv2, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis
+import logging, sys, os, time, datetime, threading, numpy, cv2, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis, boto3
 
 frameOk = True
+
+def upload_result(filename):
+    s3 = boto3.client('s3')
+    s3.upload_file(filename, os.environ.get("S3_BUCKET"), '360_stream/' + filename)  
+
+
+
 
 def markRectSize(target, rects, widthMul, heightMul, boxColor, boxThickness):
     """Mark rectangles in image"""
@@ -131,6 +138,8 @@ def saveFrame(frame, saveDir, saveFileName):
     if not os.path.exists(saveDir):
         os.makedirs(saveDir)
     cv2.imwrite("%s/%s" % (saveDir, saveFileName), frame)
+    
+    upload_result("%s/%s" % (saveDir, saveFileName))
         
 def initMjpegVideo(url, socketTimeout):
     """Initialize MJPEG stream"""
@@ -558,6 +567,8 @@ def main(PY3):
             # Save history image ready for ignore mask editing
             logger.info("%s/%s.png" % (fileDir, fileName))
             cv2.imwrite("%s/%s.png" % (fileDir, fileName), cv2.bitwise_not(historyImg))
+            
+            upload_result("%s/%s.png" % (fileDir, fileName))
 
 if __name__ == '__main__':
     import sys    
