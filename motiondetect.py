@@ -292,8 +292,10 @@ def main():
     mjpeg = urlparse.urlparse(config.url).scheme == "http"
     # Initialize video
     if mjpeg:
+        print ("Waiting for initial frame...")
         frameWidth, frameHeight = initMjpegVideo(config.url, config.socketTimeout)
         fps = config.fps
+        print ("Initial frame recieved. Synchronizing...")
     else:
         frameWidth, frameHeight, videoCapture, fps = initVidCapVideo(config.url)
         
@@ -362,10 +364,11 @@ def main():
         r = redis.from_url(os.environ.get("REDIS_URL"))
         r.set('det_status', 'GO')
         # Wait until buffer is full
+        print ("Waiting to fill buffer.. Preloading")
         while((len(frameBuf) < fps) and (r.get('det_status').decode('utf-8') == 'GO')):
             # 1/4 of FPS sleep
-            print(len(frameBuf))
-            time.sleep(1)              
+            time.sleep(2)     
+        print ("Buffer Filled. Beginning motion detection routine. \nContinue sending images. Use stop.py to signal stop")         
         start = time.time()
         appstart = start
         
@@ -373,12 +376,15 @@ def main():
         
         
         # Loop as long as there are frames in the buffer
-        while(r.get('det_status').decode('utf-8') == 'GO'):
+        while(len(frameBuf) > 0):
             # Wait until frame buffer is full
             while((len(frameBuf)) < fps and (r.get('det_status').decode('utf-8') == 'GO')):
                 # 1/4 of FPS sleep
-                time.sleep(1)
-                
+                time.sleep(2)
+            
+            if r.get('det_status').decode('utf-8') == 'STOP':
+                print("Stop signal recieved. Clearing up buffer")
+            
             # Get oldest frame
             frame = frameBuf[0][0]
             # Used for timestamp in frame buffer and filename
@@ -409,6 +415,7 @@ def main():
             else:
                 resizeImg = frame
                 
+            print("Processing motion detection..")
             # Detect motion
             movingAvgImg, grayImg, bwImg, motionPercent, movementLocations = motiondet.detect(movingAvgImg, 
                                                                                               maskImg, 
@@ -422,11 +429,14 @@ def main():
 
             
             
-            
+            print("Processing done.")
             if config.historyImage:
                 # Update history image
                 historyImg = numpy.bitwise_or(bwImg, historyImg)                    
             # Threshold to trigger motion
+            
+            print("motion percent: " + motionPercent)
+            
             if motionPercent > config.startThreshold or (recording and motionPercent >= config.stopThreshold):
                 #if motionPercent >= config.maxChange:
                 #    skipCount = config.skipFrames
@@ -521,7 +531,8 @@ def main():
                         os.rename("%s/%s" % (fileDir, fileName), "%s/motion-%s" % (fileDir, fileName))
                         motionDetected(logger, config.hostName, config.userName, "%s/motion-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
                     recording = False
-        
+                    
+            print("Frame processed")        
         
         
         
