@@ -26,7 +26,7 @@ sys.argv[1] = configuration file name or will default to "motiondetect.ini" if n
 
 """
 
-import configparser, logging, sys, os, time, datetime, threading, numpy, cv2, urlparse, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis
+import ConfigParser, logging, sys, os, time, datetime, threading, numpy, cv2, urlparse, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis
 
 frameOk = True
 
@@ -275,7 +275,7 @@ def main():
         configFileName = "motiondetect.ini"
     else:
         configFileName = sys.argv[1]
-    parser = configparser.SafeConfigParser()
+    parser = ConfigParser.SafeConfigParser()
     # Read configuration file
     parser.read(configFileName)
     # Configure logger
