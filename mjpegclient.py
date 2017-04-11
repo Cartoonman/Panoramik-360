@@ -106,7 +106,7 @@ def getFrame():
     r = redis.from_url(os.environ.get("REDIS_URL"))
 
     while r.get('det_ready').decode('utf-8') == "False":
-        time.sleep(5)
+        time.sleep(1)
     print("Getting Image")
     frame = get_image(r)
     
