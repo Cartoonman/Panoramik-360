@@ -28,11 +28,15 @@ sys.argv[1] = configuration file name or will default to "motiondetect.ini" if n
 
 import logging, sys, os, time, datetime, threading, numpy, cv2, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis, boto3
 
+
 frameOk = True
 
-def upload_result(filename):
+video_path = ""
+video_file = ""
+
+def upload_result(path, filename):
     s3 = boto3.client('s3')
-    s3.upload_file(filename, os.environ.get("S3_BUCKET"), '360_stream/' + filename)  
+    s3.upload_file(path, os.environ.get("S3_BUCKET"), '360_stream/data/' + filename)  
 
 
 
@@ -139,7 +143,7 @@ def saveFrame(frame, saveDir, saveFileName):
         os.makedirs(saveDir)
     cv2.imwrite("%s/%s" % (saveDir, saveFileName), frame)
     
-    upload_result("%s/%s" % (saveDir, saveFileName))
+    upload_result("%s/%s" % (saveDir, saveFileName), saveFileName)
         
 def initMjpegVideo(url, socketTimeout):
     """Initialize MJPEG stream"""
@@ -478,6 +482,10 @@ def main(PY3):
                                                   (frameWidth, frameHeight), 
                                                   True
                                                   )
+                    global video_path
+                    global video_file
+                    video_path = "%s/%s" % (fileDir, fileName)
+                    video_file = fileName
                     logger.info("Start recording (%4.2f) %s/%s @ %3.1f FPS" % (motionPercent, fileDir, fileName, fps))
                     recFrameNum = 1
                     peopleFound = False
@@ -536,6 +544,9 @@ def main(PY3):
                         videoWriter.write(f[0])
                     logger.info("Stop recording")
                     del videoWriter
+                    
+                    upload_result(video_path, video_file)
+                    
                     # Rename video to show pedestrian found
                     #if peopleFound:
                         #os.rename("%s/%s" % (fileDir, fileName), "%s/pedestrian-%s" % (fileDir, fileName))
@@ -568,7 +579,7 @@ def main(PY3):
             logger.info("%s/%s.png" % (fileDir, fileName))
             cv2.imwrite("%s/%s.png" % (fileDir, fileName), cv2.bitwise_not(historyImg))
             
-            upload_result("%s/%s.png" % (fileDir, fileName))
+            upload_result("%s/%s.png" % (fileDir, fileName), fileName)
 
 if __name__ == '__main__':
     import sys    

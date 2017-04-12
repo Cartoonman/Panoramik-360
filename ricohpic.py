@@ -10,6 +10,8 @@ import re
 import boto3
 import os
 import redis
+from glob import glob
+
 
 """
 Uploads the resulting processed image to S3 for debugging/presenting to users to show the
@@ -28,7 +30,7 @@ def takePicture():
 
     r = redis.from_url(os.environ.get("REDIS_URL"))
     
-    p = subprocess.Popen(["ptpcam", "-R", "0x100e"])
+    """p = subprocess.Popen(["ptpcam", "-R", "0x100e"])
     time.sleep(5)
     #p.kill()
     # example of grabbing device info and using it in your python program.
@@ -68,10 +70,14 @@ def takePicture():
         
         
     if filename == "":
-    	return
-    print ("Uploading")
-    
-    upload_result(r,  filename)
+    	return"""
+    imglist = glob('photos/*.JPG')
+    	
+
+    for x in imglist:
+        print ("Uploading")
+        upload_result(r,  x)
+        time.sleep(10)
     
     
 if __name__ == '__main__':
