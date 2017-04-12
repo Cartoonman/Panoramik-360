@@ -537,17 +537,17 @@ def main(PY3):
                     logger.info("Stop recording")
                     del videoWriter
                     # Rename video to show pedestrian found
-                    if peopleFound:
-                        os.rename("%s/%s" % (fileDir, fileName), "%s/pedestrian-%s" % (fileDir, fileName))
-                        pedestrianDetected(logger, config.hostName, config.userName, "%s/pedestrian-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
+                    #if peopleFound:
+                        #os.rename("%s/%s" % (fileDir, fileName), "%s/pedestrian-%s" % (fileDir, fileName))
+                        #pedestrianDetected(logger, config.hostName, config.userName, "%s/pedestrian-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
                     # Rename video to show cascade found
-                    elif cascadeFound:
-                        os.rename("%s/%s" % (fileDir, fileName), "%s/cascade-%s" % (fileDir, fileName))
-                        cascadeDetected(logger, config.hostName, config.userName, "%s/cascade-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
+                    #elif cascadeFound:
+                        #os.rename("%s/%s" % (fileDir, fileName), "%s/cascade-%s" % (fileDir, fileName))
+                        #cascadeDetected(logger, config.hostName, config.userName, "%s/cascade-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
                     # Rename video to show motion found
-                    else:
-                        os.rename("%s/%s" % (fileDir, fileName), "%s/motion-%s" % (fileDir, fileName))
-                        motionDetected(logger, config.hostName, config.userName, "%s/motion-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
+                    #else:
+                        #os.rename("%s/%s" % (fileDir, fileName), "%s/motion-%s" % (fileDir, fileName))
+                        #motionDetected(logger, config.hostName, config.userName, "%s/motion-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
                     recording = False
                     
             print("Frame processed")        
