@@ -33,9 +33,6 @@ import numpy as np
 
 frameOk = True
 
-video_path = ""
-video_file = ""
-
 UPLOAD = False
 LOCAL = False
 
@@ -489,25 +486,24 @@ def main(PY3):
                 # Create dir if it doesn"t exist
                 if not os.path.exists(fileDir):
                     os.makedirs(fileDir)
-                fileName = "%s.%s" % (now.strftime("%H-%M-%S"), config.recordFileExt)
-                videoWriter = cv2.VideoWriter("%s/%s" % ('/tmp', fileName), 
-                                              cv2.VideoWriter_fourcc(
-                                                    config.fourcc[0], 
-                                                    config.fourcc[1], 
-                                                    config.fourcc[2], 
-                                                    config.fourcc[3]), 
-                                              3, 
-                                              (frameResizeWidth*2, frameResizeHeight*3), 
-                                              True
+                #videoWriter = cv2.VideoWriter("%s/%s" % ('/tmp', fileName), 
+                #                              cv2.VideoWriter_fourcc(
+                #                                    config.fourcc[0], 
+                #                                    config.fourcc[1], 
+                #                                    config.fourcc[2], 
+                #                                    config.fourcc[3]), 
+                #                              3, 
+                #                              (frameResizeWidth*2, frameResizeHeight*3), 
+                #                             True
                                               )
-                global video_path
-                global video_file
-                video_path = "%s/%s" % ('/tmp', fileName)
-                video_file = fileName
-                logger.info("Start recording (%4.2f) %s/%s @ %3.1f FPS" % (motionPercent, video_path, fileName, fps))
-                recFrameNum = 1
-                peopleFound = False
-                cascadeFound = False
+                #global video_path
+                #global video_file
+                #video_path = "%s/%s" % ('/tmp', fileName)
+                #video_file = fileName
+                #logger.info("Start recording (%4.2f) %s/%s @ %3.1f FPS" % (motionPercent, video_path, fileName, fps))
+                #recFrameNum = 1
+                #peopleFound = False
+                #cascadeFound = False
                 recording = True
         if config.mark:
             # Draw rectangle around found objects
@@ -602,6 +598,21 @@ def main(PY3):
             if UPLOAD:
                 upload_result("%s/%s.png" % (fileDir, fileName), fileName)
                 
+                
+                
+        fileName = "%s.%s" % (now.strftime("%H-%M-%S"), config.recordFileExt)
+        logger.info("Start recording %s/%s @ %3.1f FPS" % (video_path, fileName, fps))
+        videoWriter = cv2.VideoWriter("%s/%s" % ('/tmp', fileName), 
+                              cv2.VideoWriter_fourcc(
+                                    config.fourcc[0], 
+                                    config.fourcc[1], 
+                                    config.fourcc[2], 
+                                    config.fourcc[3]), 
+                              3, 
+                              (frameResizeWidth*2, frameResizeHeight*3), 
+                              True
+                              )
+        
                 
         logger.info("Writing %d frames of history buffer" % motiondet.indx)        
         for x in range(motiondet.indx):
