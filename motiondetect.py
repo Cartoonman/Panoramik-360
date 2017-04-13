@@ -635,6 +635,7 @@ def main(PY3):
             videoWriter.write(video_frame)
         
         logger.info("Stop recording")
+        videoWriter.release()
         del videoWriter
         if UPLOAD:
             upload_result(video_path, video_file)
