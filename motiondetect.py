@@ -37,6 +37,7 @@ video_path = ""
 video_file = ""
 
 UPLOAD = False
+LOCAL = False
 
 def upload_result(path, filename):
     print("Uploading")
@@ -171,18 +172,21 @@ def initVidCapVideo(url):
 
 def readMjpegFrames(logger, frameBuf, frameBufMax):
     """Read frames and append to buffer"""
-    global frameOk
-    res = (cv2.imread(x) for x in sorted(glob('photos/*.JPG')))
+    global frameOk, LOCAL
+    if LOCAL:
+        res = (cv2.imread(x) for x in sorted(glob('photos/*.JPG')))
     while(frameOk):
         now = datetime.datetime.now()
         # Make sure thread doesn't hang in case of socket time out, etc.
         image = None
-        try:
-            image = next(res)
-        except StopIteration:
-            pass
-            
-        ###############################image = mjpegclient.getFrame()
+        if LOCAL:
+            try:
+                image = next(res)
+            except StopIteration:
+                pass
+        
+        else:
+            image = mjpegclient.getFrame()
         #frameOk = len(jpeg) > 0
         if image is not None:
             # Make sure we do not run out of memory
@@ -193,7 +197,7 @@ def readMjpegFrames(logger, frameBuf, frameBufMax):
                 # Add new image to end of list
                 frameBuf.append((image, now))
     logger.info("Exiting video stream thread")  
-    
+
 
 def readVidCapFrames(logger, frameBuf, frameBufMax, videoCapture):
     """Read frames and append to buffer"""
@@ -297,10 +301,7 @@ def config(parser):
 def main(PY3):
     global UPLOAD
     """Main function"""
-    if len(sys.argv) < 2:
-        configFileName = "motiondetect.ini"
-    else:
-        configFileName = sys.argv[1]
+    configFileName = "motiondetect.ini"
     r = redis.from_url(os.environ.get("REDIS_URL"))
     r.set('det_status', 'GO')
     parser = None
@@ -311,7 +312,7 @@ def main(PY3):
     # Read configuration file
     parser.read(configFileName)
     # Configure logger
-    logger = logging.getLogger("motiondetect")
+    logger = logging.getLogger(__name__)
     logger.setLevel(parser.get("logging", "level"))
     formatter = logging.Formatter(parser.get("logging", "formatter"))
     handler = logging.StreamHandler(sys.stdout)
@@ -489,7 +490,7 @@ def main(PY3):
                 if not os.path.exists(fileDir):
                     os.makedirs(fileDir)
                 fileName = "%s.%s" % (now.strftime("%H-%M-%S"), config.recordFileExt)
-                videoWriter = cv2.VideoWriter("%s/%s" % (fileDir, fileName), 
+                videoWriter = cv2.VideoWriter("%s/%s" % ('/tmp', fileName), 
                                               cv2.VideoWriter_fourcc(
                                                     config.fourcc[0], 
                                                     config.fourcc[1], 
@@ -501,7 +502,7 @@ def main(PY3):
                                               )
                 global video_path
                 global video_file
-                video_path = "%s/%s" % (fileDir, fileName)
+                video_path = "%s/%s" % ('/tmp', fileName)
                 video_file = fileName
                 logger.info("Start recording (%4.2f) %s/%s @ %3.1f FPS" % (motionPercent, fileDir, fileName, fps))
                 recFrameNum = 1
@@ -605,12 +606,12 @@ def main(PY3):
         logger.info("Writing %d frames of history buffer" % motiondet.indx)        
         for x in range(motiondet.indx):
         
-            image1 = cv2.imread('k/img' + str(x) + '.jpg')
-            image2 = cv2.imread('k/imgw' + str(x) + '.jpg')
-            image3 = cv2.imread('k/imgma' + str(x) + '.jpg')
-            image4 = cv2.imread('k/imgd' + str(x) + '.jpg')
-            image5 = cv2.imread('k/imgmaG' + str(x) + '.jpg')
-            image6 = cv2.imread('k/imgmaBW' + str(x) + '.jpg')
+            image1 = cv2.imread('/tmp/img' + str(x) + '.jpg')
+            image2 = cv2.imread('/tmp/imgw' + str(x) + '.jpg')
+            image3 = cv2.imread('/tmp/imgma' + str(x) + '.jpg')
+            image4 = cv2.imread('/tmp/imgd' + str(x) + '.jpg')
+            image5 = cv2.imread('/tmp/imgmaG' + str(x) + '.jpg')
+            image6 = cv2.imread('/tmp/imgmaBW' + str(x) + '.jpg')
             video_frame = np.zeros((image1.shape[0]*3,image1.shape[1]*2,3), np.uint8)
             
             video_frame[0:image1.shape[0], 0:image1.shape[1]] = image1
@@ -631,7 +632,7 @@ if __name__ == '__main__':
     # prints whether python is version 3 or not
     python_version = sys.version_info.major
     PY3 = True
-    global UPLOAD
+    global UPLOAD, LOCAL
     if python_version == 3:
         print("is python 3")
         import configparser
@@ -642,7 +643,10 @@ if __name__ == '__main__':
         import urlparse
         PY3 = False
     if len(sys.argv) > 1:
-        if argv[1].lower() == 'upload':
-            UPLOAD = True
+        for x in sys.argv[1:]:
+            if x == 'upload':
+                UPLOAD = True
+            if x == 'local':
+                LOCAL = True
 
     main(PY3)
