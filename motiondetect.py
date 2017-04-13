@@ -504,7 +504,7 @@ def main(PY3):
                 global video_file
                 video_path = "%s/%s" % ('/tmp', fileName)
                 video_file = fileName
-                logger.info("Start recording (%4.2f) %s/%s @ %3.1f FPS" % (motionPercent, fileDir, fileName, fps))
+                logger.info("Start recording (%4.2f) %s/%s @ %3.1f FPS" % (motionPercent, video_path, fileName, fps))
                 recFrameNum = 1
                 peopleFound = False
                 cascadeFound = False
