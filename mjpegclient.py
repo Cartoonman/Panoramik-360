@@ -16,6 +16,7 @@ import os
 import boto3
 import redis
 import time
+from glob import glob
 
     
 def get_image(r):
@@ -34,6 +35,8 @@ def getFrame():
 
     while r.get('det_ready').decode('utf-8') == "False":
         time.sleep(1)
+        if (r.get('det_status').decode('utf-8') == 'STOP'):
+            return None
     print("Getting Image")
     frame = get_image(r)
     

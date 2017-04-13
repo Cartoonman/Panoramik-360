@@ -71,14 +71,17 @@ def takePicture():
         
     if filename == "":
     	return"""
-    imglist = glob('photos/*.JPG')
+    imglist = sorted(glob('photos/*.JPG'))
     	
 
     for x in imglist:
         print ("Uploading")
+        print x
         upload_result(r,  x)
-        time.sleep(10)
-    
+        print(r.get('det_ready').decode('utf-8'))
+        while r.get('det_ready').decode('utf-8') == "True":
+            time.sleep(1)
+              
     
 if __name__ == '__main__':
     takePicture()
