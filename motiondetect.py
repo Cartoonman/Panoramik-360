@@ -495,7 +495,7 @@ def main(PY3):
                 #                              3, 
                 #                              (frameResizeWidth*2, frameResizeHeight*3), 
                 #                             True
-                                              )
+                                              #)
                 #global video_path
                 #global video_file
                 #video_path = "%s/%s" % ('/tmp', fileName)
