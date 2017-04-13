@@ -505,44 +505,45 @@ def main(PY3):
                 #peopleFound = False
                 #cascadeFound = False
                 recording = True
-        if config.mark:
-            # Draw rectangle around found objects
-            markRectSize(frame, movementLocations, widthMultiplier, heightMultiplier, (0, 255, 0), 2)
-        if config.saveFrames:
-            thread = threading.Thread(target=saveFrame, args=(frame, "%s/new-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % recFrameNum,))
-            thread.start()
-        # Detect pedestrians ?
-        if config.detectType.lower() == "p":
-            locationsList, foundLocationsList, foundWeightsList = pedestriandet.detect(movementLocations, resizeImg, config.winStride, config.padding, config.scale0)
-            if len(foundLocationsList) > 0:
-                # Only filter if minWeight > 0.0
-                if config.minWeight > 0.0:
-                    # Filter found location by weight
-                    foundLocationsList, foundWeightsList = filterByWeight(foundLocationsList, foundWeightsList, config.minWeight)
-                # Any hits after possible filtering?
+            if config.mark:
+                # Draw rectangle around found objects
+                markRectSize(frame, movementLocations, widthMultiplier, heightMultiplier, (0, 255, 0), 2)
+            if config.saveFrames:
+                fileName = "%s.%s" % (now.strftime("%H-%M-%S"), config.recordFileExt)
+                thread = threading.Thread(target=saveFrame, args=(frame, "%s/new-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % 1,))
+                thread.start()
+            # Detect pedestrians ?
+            if config.detectType.lower() == "p":
+                locationsList, foundLocationsList, foundWeightsList = pedestriandet.detect(movementLocations, resizeImg, config.winStride, config.padding, config.scale0)
                 if len(foundLocationsList) > 0:
-                    peopleFound = True
+                    # Only filter if minWeight > 0.0
+                    if config.minWeight > 0.0:
+                        # Filter found location by weight
+                        foundLocationsList, foundWeightsList = filterByWeight(foundLocationsList, foundWeightsList, config.minWeight)
+                    # Any hits after possible filtering?
+                    if len(foundLocationsList) > 0:
+                        peopleFound = True
+                        if config.mark:
+                            # Draw rectangle around found objects
+                            markRectWeight(frame, locationsList, foundLocationsList, foundWeightsList, widthMultiplier, heightMultiplier, (255, 0, 0), 2)
+                        # Save off detected elapsedFrames
+                        if config.saveFrames:
+                            thread = threading.Thread(target=saveFrame, args=(frame, "%s/pedestrian-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % recFrameNum,))
+                            thread.start()
+                        logger.debug("Pedestrian detected locations: %s" % foundLocationsList)
+            # Haar Cascade detection?
+            elif config.detectType.lower() == "h":
+                locationsList, foundLocationsList = cascadedet.detect(movementLocations, grayImg, config.scaleFactor, config.minNeighbors, config.minWidth, config.minHeight)
+                if len(foundLocationsList) > 0:
+                    cascadeFound = True
                     if config.mark:
                         # Draw rectangle around found objects
-                        markRectWeight(frame, locationsList, foundLocationsList, foundWeightsList, widthMultiplier, heightMultiplier, (255, 0, 0), 2)
-                    # Save off detected elapsedFrames
-                    if config.saveFrames:
-                        thread = threading.Thread(target=saveFrame, args=(frame, "%s/pedestrian-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % recFrameNum,))
-                        thread.start()
-                    logger.debug("Pedestrian detected locations: %s" % foundLocationsList)
-        # Haar Cascade detection?
-        elif config.detectType.lower() == "h":
-            locationsList, foundLocationsList = cascadedet.detect(movementLocations, grayImg, config.scaleFactor, config.minNeighbors, config.minWidth, config.minHeight)
-            if len(foundLocationsList) > 0:
-                cascadeFound = True
-                if config.mark:
-                    # Draw rectangle around found objects
-                    markRoi(frame, locationsList, foundLocationsList, widthMultiplier, heightMultiplier, (255, 0, 0), 2)
-                    # Save off detected elapsedFrames
-                    if config.saveFrames:
-                        thread = threading.Thread(target=saveFrame, args=(frame, "%s/cascade-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % recFrameNum,))
-                        thread.start()
-                logger.debug("Cascade detected locations: %s" % foundLocationsList)
+                        markRoi(frame, locationsList, foundLocationsList, widthMultiplier, heightMultiplier, (255, 0, 0), 2)
+                        # Save off detected elapsedFrames
+                        if config.saveFrames:
+                            thread = threading.Thread(target=saveFrame, args=(frame, "%s/cascade-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % recFrameNum,))
+                            thread.start()
+                    logger.debug("Cascade detected locations: %s" % foundLocationsList)
 
             # If recording write frame and check motion percent
             #if recording:
@@ -601,7 +602,7 @@ def main(PY3):
                 
                 
         fileName = "%s.%s" % (now.strftime("%H-%M-%S"), config.recordFileExt)
-        logger.info("Start recording %s/%s @ %3.1f FPS" % (video_path, fileName, fps))
+        logger.info("Start recording %s @ %3.1f FPS" % (fileName, fps))
         videoWriter = cv2.VideoWriter("%s/%s" % ('/tmp', fileName), 
                               cv2.VideoWriter_fourcc(
                                     config.fourcc[0], 
