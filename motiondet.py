@@ -12,6 +12,8 @@ sgoldsmith@codeferm.com
 """
 
 import numpy, cv2
+import os
+
 
 
 
@@ -70,21 +72,21 @@ def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange
     movementLocationsFiltered = []
     # Generate work image by blurring
     workImg = cv2.blur(image, kSize)
-    cv2.imwrite('/tmp/imgw'+str(indx) + '.jpg', workImg)
+    cv2.imwrite('/tmp/frames/imgw'+str(indx) + '.jpg', workImg)
     # Generate moving average image if needed
     if movingAvgImg is None:
         movingAvgImg = numpy.float32(workImg)
     # Generate moving average image
     cv2.accumulateWeighted(workImg, movingAvgImg, alpha)
-    cv2.imwrite('/tmp/imgma'+str(indx) + '.jpg', movingAvgImg)
+    cv2.imwrite('/tmp/frames/imgma'+str(indx) + '.jpg', movingAvgImg)
     diffImg = cv2.absdiff(workImg, cv2.convertScaleAbs(movingAvgImg))
-    cv2.imwrite('/tmp/imgd'+str(indx) + '.jpg', diffImg)
+    cv2.imwrite('/tmp/frames/imgd'+str(indx) + '.jpg', diffImg)
     # Convert to grayscale
     grayImg = cv2.cvtColor(diffImg, cv2.COLOR_BGR2GRAY)
-    cv2.imwrite('/tmp/imgmaG'+str(indx) + '.jpg', grayImg)
+    cv2.imwrite('/tmp/frames/imgmaG'+str(indx) + '.jpg', grayImg)
     # Convert to BW
     ret, bwImg = cv2.threshold(grayImg, blackThreshold, 255, cv2.THRESH_BINARY)
-    cv2.imwrite('/tmp/imgmaBW'+str(indx) + '.jpg', bwImg)
+    cv2.imwrite('/tmp/frames/imgmaBW'+str(indx) + '.jpg', bwImg)
     # Apply ignore mask
     if maskImg is not None:
         bwImg = numpy.bitwise_and(bwImg, maskImg)     
@@ -109,6 +111,6 @@ def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange
                 movementLocationsFiltered.append(r)
     video_image = image.copy()
     markRectSize(video_image, movementLocationsFiltered, (0, 255, 0), 2)
-    cv2.imwrite('/tmp/img'+str(indx) + '.jpg', video_image)
+    cv2.imwrite('/tmp/frames/img'+ str(indx) + '.jpg', video_image)
     indx = indx + 1
     return movingAvgImg, grayImg, bwImg, motionPercent, movementLocationsFiltered

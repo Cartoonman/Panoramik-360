@@ -26,10 +26,11 @@ sys.argv[1] = configuration file name or will default to "motiondetect.ini" if n
 
 """
 
-import logging, sys, os, time, datetime, threading, numpy, cv2, mjpegclient, motiondet, pedestriandet, cascadedet, scpfile, redis, boto3
+import logging, sys, os, time, datetime, threading, numpy, cv2, mjpegclient, motiondet, redis, boto3
 from glob import glob
 import numpy as np
-
+import shutil
+import errno
 
 frameOk = True
 
@@ -37,6 +38,8 @@ UPLOAD = False
 LOCAL = False
 
 def upload_result(path, filename):
+    if UPLOAD is False:
+        return
     print("Uploading")
     s3 = boto3.client('s3')
     s3.upload_file(path, os.environ.get("S3_BUCKET"), '360_stream/data/' + filename)  
@@ -140,14 +143,23 @@ def markRoi(target, locList, foundLocsList, widthMul, heightMul, boxColor, boxTh
             cv2.putText(target, label, (x2 + x4, y2 + y4), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), thickness=1, lineType=cv2.LINE_AA)
 
 def saveFrame(frame, saveDir, saveFileName):
-    global UPLOAD
     """Save frame"""
     # Create dir if it doesn"t exist
     if not os.path.exists(saveDir):
         os.makedirs(saveDir)
     cv2.imwrite("%s/%s" % (saveDir, saveFileName), frame)
-    if UPLOAD:
-        upload_result("%s/%s" % (saveDir, saveFileName), saveFileName)
+    upload_result("%s/%s" % (saveDir, saveFileName), saveFileName)
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            shutil.rmtree(path)
+            os.makedirs(path)
+        else:
+            raise
+
         
 def initMjpegVideo(url, socketTimeout):
     """Initialize MJPEG stream"""
@@ -180,7 +192,7 @@ def readMjpegFrames(logger, frameBuf, frameBufMax):
             try:
                 image = next(res)
             except StopIteration:
-                pass
+                break
         
         else:
             image = mjpegclient.getFrame()
@@ -220,32 +232,6 @@ def readVidCapFrames(logger, frameBuf, frameBufMax, videoCapture):
                 time.sleep(fpsTime - elapsed)
     logger.info("Exiting video stream thread")  
 
-def motionDetected(logger, hostName, userName, localFileName, remoteDir, deleteSource, timeout):
-    """Actions to take after motion detected"""
-    logger.info("Motion detected subprocess submit")
-    return # remove to actually do something
-    # SCP video file to central server
-    thread = threading.Thread(target=scpfile.copyFile, args=(logger, hostName, userName, localFileName, remoteDir, deleteSource, timeout,))
-    thread.start()
-    logger.info("Motion detected subprocess submitted")
-
-def pedestrianDetected(logger, hostName, userName, localFileName, remoteDir, deleteSource, timeout):
-    """Actions to take after pedestrians detected"""
-    logger.info("Pedestrian detected subprocess submit")
-    return # remove to actually do something
-    # SCP video file to central server
-    thread = threading.Thread(target=scpfile.copyFile, args=(logger, hostName, userName, localFileName, remoteDir, deleteSource, timeout,))
-    thread.start()
-    logger.info("Pedestrian detected subprocess submitted")
-
-def cascadeDetected(logger, hostName, userName, localFileName, remoteDir, deleteSource, timeout):
-    """Actions to take after pedestrians detected"""
-    logger.info("Cascade detected subprocess submit")
-    return # remove to actually do something
-    # SCP video file to central server
-    thread = threading.Thread(target=scpfile.copyFile, args=(logger, hostName, userName, localFileName, remoteDir, deleteSource, timeout,))
-    thread.start()
-    logger.info("Cascade detected subprocess submitted")
 
 def config(parser):
     """Configure from INI file"""
@@ -288,12 +274,7 @@ def config(parser):
     config.minNeighbors = parser.getint("cascade", "minNeighbors")
     config.minWidth = parser.getint("cascade", "minWidth")
     config.minHeight = parser.getint("cascade", "minHeight")
-    # Set SCP related attributes
-    config.hostName = parser.get("scp", "hostName")
-    config.userName = parser.get("scp", "userName")
-    config.remoteDir = parser.get("scp", "remoteDir")
-    config.timeout = parser.getint("scp", "timeout")
-    config.deleteSource = parser.getboolean("scp", "deleteSource")
+
 
 def main(PY3):
     global UPLOAD
@@ -365,9 +346,6 @@ def main(PY3):
         elapsedFrames = 0
         frameTotal = 0
         fileDir = None
-        # Init cascade classifier
-        if config.detectType.lower() == "h":
-            cascadedet.init(os.path.expanduser(config.cascadeFile))
         if config.historyImage:
             # Create black history image
             historyImg = numpy.zeros((frameResizeHeight, frameResizeWidth), numpy.uint8)
@@ -407,9 +385,9 @@ def main(PY3):
         start = time.time()
         appstart = start
         
-        
-        
-        
+        #mkdir_p('/tmp/raw_frames') 
+        mkdir_p('/tmp/frames') 
+        indx = 0
         # Loop as long as there are frames in the buffer
         while(len(frameBuf) > 0):
             # Wait until frame buffer is full
@@ -479,105 +457,22 @@ def main(PY3):
             #    skipCount = config.skipFrames
             #    logger.debug("Maximum motion change: %4.2f" % motionPercent)
             if not recording:
-                #ONLYOCCURSONCE
+
                 # Construct directory name from camera name, recordDir and date
                 dateStr = now.strftime("%Y-%m-%d")
                 fileDir = "%s/%s/%s" % (os.path.expanduser(config.recordDir), config.cameraName, dateStr)
                 # Create dir if it doesn"t exist
                 if not os.path.exists(fileDir):
                     os.makedirs(fileDir)
-                #videoWriter = cv2.VideoWriter("%s/%s" % ('/tmp', fileName), 
-                #                              cv2.VideoWriter_fourcc(
-                #                                    config.fourcc[0], 
-                #                                    config.fourcc[1], 
-                #                                    config.fourcc[2], 
-                #                                    config.fourcc[3]), 
-                #                              3, 
-                #                              (frameResizeWidth*2, frameResizeHeight*3), 
-                #                             True
-                                              #)
-                #global video_path
-                #global video_file
-                #video_path = "%s/%s" % ('/tmp', fileName)
-                #video_file = fileName
-                #logger.info("Start recording (%4.2f) %s/%s @ %3.1f FPS" % (motionPercent, video_path, fileName, fps))
-                #recFrameNum = 1
-                #peopleFound = False
-                #cascadeFound = False
                 recording = True
             if config.mark:
                 # Draw rectangle around found objects
                 markRectSize(frame, movementLocations, widthMultiplier, heightMultiplier, (0, 255, 0), 2)
             if config.saveFrames:
-                fileName = "%s.%s" % (now.strftime("%H-%M-%S"), config.recordFileExt)
-                thread = threading.Thread(target=saveFrame, args=(frame, "%s/new-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % 1,))
-                thread.start()
-            # Detect pedestrians ?
-            if config.detectType.lower() == "p":
-                locationsList, foundLocationsList, foundWeightsList = pedestriandet.detect(movementLocations, resizeImg, config.winStride, config.padding, config.scale0)
-                if len(foundLocationsList) > 0:
-                    # Only filter if minWeight > 0.0
-                    if config.minWeight > 0.0:
-                        # Filter found location by weight
-                        foundLocationsList, foundWeightsList = filterByWeight(foundLocationsList, foundWeightsList, config.minWeight)
-                    # Any hits after possible filtering?
-                    if len(foundLocationsList) > 0:
-                        peopleFound = True
-                        if config.mark:
-                            # Draw rectangle around found objects
-                            markRectWeight(frame, locationsList, foundLocationsList, foundWeightsList, widthMultiplier, heightMultiplier, (255, 0, 0), 2)
-                        # Save off detected elapsedFrames
-                        if config.saveFrames:
-                            thread = threading.Thread(target=saveFrame, args=(frame, "%s/pedestrian-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % recFrameNum,))
-                            thread.start()
-                        logger.debug("Pedestrian detected locations: %s" % foundLocationsList)
-            # Haar Cascade detection?
-            elif config.detectType.lower() == "h":
-                locationsList, foundLocationsList = cascadedet.detect(movementLocations, grayImg, config.scaleFactor, config.minNeighbors, config.minWidth, config.minHeight)
-                if len(foundLocationsList) > 0:
-                    cascadeFound = True
-                    if config.mark:
-                        # Draw rectangle around found objects
-                        markRoi(frame, locationsList, foundLocationsList, widthMultiplier, heightMultiplier, (255, 0, 0), 2)
-                        # Save off detected elapsedFrames
-                        if config.saveFrames:
-                            thread = threading.Thread(target=saveFrame, args=(frame, "%s/cascade-%s" % (fileDir, os.path.splitext(fileName)[0]), "%d.jpg" % recFrameNum,))
-                            thread.start()
-                    logger.debug("Cascade detected locations: %s" % foundLocationsList)
 
-            # If recording write frame and check motion percent
-            #if recording:
-                #if len(historyBuf) > 0:
-                    # Write first image in history buffer (the oldest)
-                    #videoWriter.write(historyBuf[0][0])
-                    
-                    
-                    #videoWriter.write(historyBuf[0][0][0:frameResizeHeight, 0:frameResizeWidth])
-                    #recFrameNum += 1
-                # Threshold to stop recording or empty frame buffer
-                #if len(frameBuf) == 0:
-                    # Write off frame buffer skipping frame already written
-                    #logger.info("Writing %d frames of history buffer" % len(frameBuf))
-                    #for f in historyBuf[1:]:
-                    #    videoWriter.write(f[0][0:frameResizeHeight, 0:frameResizeWidth])
-                    #logger.info("Stop recording")
-                    #del videoWriter
-                    #if UPLOAD:
-                    #    upload_result(video_path, video_file)
-                    
-                    # Rename video to show pedestrian found
-                    #if peopleFound:
-                        #os.rename("%s/%s" % (fileDir, fileName), "%s/pedestrian-%s" % (fileDir, fileName))
-                        #pedestrianDetected(logger, config.hostName, config.userName, "%s/pedestrian-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
-                    # Rename video to show cascade found
-                    #elif cascadeFound:
-                        #os.rename("%s/%s" % (fileDir, fileName), "%s/cascade-%s" % (fileDir, fileName))
-                        #cascadeDetected(logger, config.hostName, config.userName, "%s/cascade-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
-                    # Rename video to show motion found
-                    #else:
-                        #os.rename("%s/%s" % (fileDir, fileName), "%s/motion-%s" % (fileDir, fileName))
-                        #motionDetected(logger, config.hostName, config.userName, "%s/motion-%s" % (fileDir, fileName), "%s/%s" % (config.remoteDir, dateStr), config.deleteSource, config.timeout)
-                    #recording = False
+                cv2.imwrite('/tmp/raw_frames/frame' + str(indx) + '.jpg', frame)
+
+                indx = indx + 1
                     
             print("Frame processed")        
         
@@ -594,51 +489,21 @@ def main(PY3):
             del videoCapture
         if config.historyImage and fileDir is not None:
             # Save history image ready for ignore mask editing
+            fileName = "%s.%s" % (now.strftime("%H-%M-%S"), 'png')
             logger.info("%s/%s.png" % (fileDir, fileName))
             cv2.imwrite("%s/%s.png" % (fileDir, fileName), cv2.bitwise_not(historyImg))
-            if UPLOAD:
-                upload_result("%s/%s.png" % (fileDir, fileName), fileName)
+            upload_result("%s/%s.png" % (fileDir, fileName), fileName)
                 
                 
-                
-        fileName = "%s.%s" % (now.strftime("%H-%M-%S"), config.recordFileExt)
-        logger.info("Start recording %s @ %3.1f FPS" % (fileName, fps))
-        videoWriter = cv2.VideoWriter("%s/%s" % ('/tmp', fileName), 
-                              cv2.VideoWriter_fourcc(
-                                    config.fourcc[0], 
-                                    config.fourcc[1], 
-                                    config.fourcc[2], 
-                                    config.fourcc[3]), 
-                              3, 
-                              (frameResizeWidth*2, frameResizeHeight*3), 
-                              True
-                              )
+        shutil.make_archive('/tmp/frame_zip', 'zip', '/tmp/frames')
+        #shutil.make_archive('/tmp/raw_frame_zip', 'zip', '/tmp/raw_frames/')
         
+        upload_result('/tmp/frame_zip.zip', 'frame.zip')
+        r.set('v_frames_ready', True)
+        r.set('v_frames_count', motiondet.indx)
+        #upload_result('/tmp/raw_frame_zip.zip', 'raw_frame.zip')
                 
-        logger.info("Writing %d frames of history buffer" % motiondet.indx)        
-        for x in range(motiondet.indx):
-        
-            image1 = cv2.imread('/tmp/img' + str(x) + '.jpg')
-            image2 = cv2.imread('/tmp/imgw' + str(x) + '.jpg')
-            image3 = cv2.imread('/tmp/imgma' + str(x) + '.jpg')
-            image4 = cv2.imread('/tmp/imgd' + str(x) + '.jpg')
-            image5 = cv2.imread('/tmp/imgmaG' + str(x) + '.jpg')
-            image6 = cv2.imread('/tmp/imgmaBW' + str(x) + '.jpg')
-            video_frame = np.zeros((image1.shape[0]*3,image1.shape[1]*2,3), np.uint8)
-            
-            video_frame[0:image1.shape[0], 0:image1.shape[1]] = image1
-            video_frame[image1.shape[0]:image1.shape[0]*2, 0:image1.shape[1]] = image2
-            video_frame[image1.shape[0]*2:image1.shape[0]*3, 0:image1.shape[1]] = image3
-            video_frame[0:image1.shape[0], image1.shape[1]:image1.shape[1]*2] = image4
-            video_frame[image1.shape[0]:image1.shape[0]*2, image1.shape[1]:image1.shape[1]*2] = image5
-            video_frame[image1.shape[0]*2:image1.shape[0]*3, image1.shape[1]:image1.shape[1]*2] = image6
-            videoWriter.write(video_frame)
-        
-        logger.info("Stop recording")
-        videoWriter.release()
-        del videoWriter
-        if UPLOAD:
-            upload_result(video_path, video_file)
+
 
 if __name__ == '__main__':
     import sys    
