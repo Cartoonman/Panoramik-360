@@ -33,11 +33,11 @@ import shutil
 import errno
 
 frameOk = True
-
 UPLOAD = False
 LOCAL = False
 
 def upload_result(path, filename):
+    global UPLOAD
     if UPLOAD is False:
         return
     print("Uploading")
@@ -70,85 +70,7 @@ def markRectSize(target, rects, widthMul, heightMul, boxColor, boxThickness):
         # Show width and height of full size image
         cv2.putText(target, label, (x2, y2), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), thickness=1, lineType=cv2.LINE_AA)
         
-def filterByWeight(foundLocsList, foundWghtsList, minWeight):
-    """Filter out found locations by weight"""
-    filteredFoundLocations = []
-    filteredFoundWeights = []
-    for foundWeights, foundLocations in zip(foundWghtsList, foundLocsList):
-        filteredLocations = []
-        filteredWeights = []
-        i = 0
-        # Filter by weight
-        for w in foundWeights:
-            if w >= minWeight:
-                filteredLocations.append(foundLocations[i])
-                filteredWeights.append(w)
-            i += 1
-        if len(filteredLocations) > 0:
-            filteredFoundLocations.append(filteredLocations)
-            filteredFoundWeights.append(filteredWeights)
-    return filteredFoundLocations, filteredFoundWeights
 
-def markRectWeight(target, locList, foundLocsList, foundWghtsList, widthMul, heightMul, boxColor, boxThickness):
-    """Mark ROI rectangles with weight in image"""
-    for location, foundLocations, foundWeights in zip(locList, foundLocsList, foundWghtsList):
-        i = 0
-        # Mark target
-        for x, y, w, h in foundLocations:
-            # Calculate full size
-            x2 = x * widthMul
-            y2 = y * heightMul
-            w2 = w * widthMul
-            h2 = h * heightMul            
-            x3, y3, w3, h3 = location
-            # Calculate full size
-            x4 = x3 * widthMul
-            y4 = y3 * heightMul
-            # Mark target
-            cv2.rectangle(target, (x2 + x4, y2 + y4), (x2 + x4 + w2, y2 + y4 + h2), boxColor, boxThickness)
-            label = "%1.2f" % foundWeights[i]
-            # Figure out text size
-            size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1.0, 1)[0]            
-            # Print weight
-            cv2.putText(target, label, (x2 + x4, y2 + y4 + h2 - size[1]), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), thickness=1, lineType=cv2.LINE_AA)
-            i += 1
-
-def markRoi(target, locList, foundLocsList, widthMul, heightMul, boxColor, boxThickness):
-    """Mark ROI objects in image"""
-    for location, foundLocations in zip(locList, foundLocsList):
-        # Mark target
-        for x, y, w, h in foundLocations:
-            # Calculate full size
-            x2 = x * widthMul
-            y2 = y * heightMul
-            w2 = w * widthMul
-            h2 = h * heightMul            
-            x3, y3, w3, h3 = location
-            # Calculate full size
-            x4 = x3 * widthMul
-            y4 = y3 * heightMul
-            # Mark target
-            cv2.rectangle(target, (x2 + x4, y2 + y4), (x2 + x4 + w2, y2 + y4 + h2), boxColor, boxThickness)
-            label = "%dx%d" % (w2, h2)
-            # Figure out text size
-            size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1.0, 1)[0]            
-            # Deal with possible text outside of image bounds
-            if x2 < 0:
-                x2 = 0
-            if y2 < size[1]:
-                y2 = size[1] + 2
-            else:
-                y2 = y2 - 2
-            # Show width and height of full size image
-            cv2.putText(target, label, (x2 + x4, y2 + y4), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), thickness=1, lineType=cv2.LINE_AA)
-
-def saveFrame(frame, saveDir, saveFileName):
-    """Save frame"""
-    # Create dir if it doesn"t exist
-    if not os.path.exists(saveDir):
-        os.makedirs(saveDir)
-    cv2.imwrite("%s/%s" % (saveDir, saveFileName), frame)
-    upload_result("%s/%s" % (saveDir, saveFileName), saveFileName)
 
 def mkdir_p(path):
     try:
@@ -161,23 +83,15 @@ def mkdir_p(path):
             raise
 
         
-def initMjpegVideo(url, socketTimeout):
+def initMjpegVideo():
     """Initialize MJPEG stream"""
     # Open MJPEG stream
-    # socketFile, streamSock, boundary = mjpegclient.open(url, socketTimeout)
     # Determine image dimensions
     image = mjpegclient.getFrame()
     frameHeight, frameWidth, channels = image.shape
     return frameWidth, frameHeight
 
-def initVidCapVideo(url):
-    """Initialize VideoCapture stream"""
-    # Process file or other URL with VideoCapture
-    videoCapture = cv2.VideoCapture(url)
-    frameHeight = int(videoCapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frameWidth = int(videoCapture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    fps = int(videoCapture.get(cv2.CAP_PROP_FPS))
-    return frameWidth, frameHeight, videoCapture, fps
+
 
 def readMjpegFrames(logger, frameBuf, frameBufMax):
     """Read frames and append to buffer"""
@@ -208,36 +122,12 @@ def readMjpegFrames(logger, frameBuf, frameBufMax):
     logger.info("Exiting video stream thread")  
 
 
-def readVidCapFrames(logger, frameBuf, frameBufMax, videoCapture):
-    """Read frames and append to buffer"""
-    global frameOk
-    fps = videoCapture.get(cv2.CAP_PROP_FPS)
-    fpsTime = 1 / fps
-    while(frameOk):
-        start = time.time()
-        now = datetime.datetime.now()
-        frameOk, image = videoCapture.read()
-        if frameOk:
-            # Make sure we do not run out of memory
-            if len(frameBuf) > frameBufMax:
-                logger.error("Frame buffer exceeded: %d" % frameBufMax)
-                frameOk = False
-            else:
-                # Add new image to end of list
-                frameBuf.append((image, now))
-            curTime = time.time()
-            elapsed = curTime - start
-            # Try to keep FPS for files consistent otherwise frameBufMax will be reached
-            if elapsed < fpsTime:
-                time.sleep(fpsTime - elapsed)
-    logger.info("Exiting video stream thread")  
 
 
 def config(parser):
     """Configure from INI file"""
     # Set camera related data attributes
     config.cameraName = parser.get("camera", "name")    
-    config.url = parser.get("camera", "url")
     config.socketTimeout = parser.getint("camera", "socketTimeout")
     config.resizeWidthDiv = parser.getint("camera", "resizeWidthDiv")
     config.fpsInterval = parser.getfloat("camera", "fpsInterval")
@@ -277,7 +167,6 @@ def config(parser):
 
 
 def main(PY3):
-    global UPLOAD
     """Main function"""
     configFileName = "motiondetect.ini"
     r = redis.from_url(os.environ.get("REDIS_URL"))
@@ -298,25 +187,17 @@ def main(PY3):
     logger.addHandler(handler)
     # Load values from ini file
     config(parser)
-    
-    # See if we have MJPEG stream
-    mjpeg = None
-    if PY3:
-        mjpeg = urllib.parse.urlparse(config.url).scheme == "http"
-    else:
-        mjpeg = urlparse.urlparse(config.url).scheme == "http"
-    
+
     # Initialize video
-    if mjpeg:
-        print ("Waiting for initial frame...")
-        frameWidth, frameHeight = initMjpegVideo(config.url, config.socketTimeout)
-        fps = config.fps
-        print ("Initial frame recieved. Synchronizing...")
-    else:
-        frameWidth, frameHeight, videoCapture, fps = initVidCapVideo(config.url)
+
+    print ("Waiting for initial frame...")
+    frameWidth, frameHeight = initMjpegVideo()
+    fps = config.fps
+    print ("Initial frame recieved. Synchronizing...")
+
         
     logger.info("OpenCV %s" % cv2.__version__)
-    logger.info("URL: %s, fps: %d" % (config.url, fps))
+    logger.info("Stream: MJPEG, fps: %d" % fps)
     logger.info("Resolution: %dx%d" % (frameWidth, frameHeight))
     
     # Make sure we have values > 0
@@ -331,12 +212,7 @@ def main(PY3):
         # Used for full size image marking
         widthMultiplier = int(frameWidth / frameResizeWidth)
         heightMultiplier = int(frameHeight / frameResizeHeight)
-        # Analyze only ~3 FPS which works well with this type of detection
-        frameToCheck = int(fps / 4)
-        # 0 means check every frame
-        if frameToCheck < 1:
-            frameToCheck = 0
-        skipCount = 0         
+   
         # Frame buffer
         frameBuf = []
         # History buffer to capture just before motion
@@ -349,6 +225,7 @@ def main(PY3):
         if config.historyImage:
             # Create black history image
             historyImg = numpy.zeros((frameResizeHeight, frameResizeWidth), numpy.uint8)
+            
         # Read ignore mask image if set
         if config.ignoreMask != "":
             maskImg = cv2.imread(config.ignoreMask, 0)
@@ -357,22 +234,15 @@ def main(PY3):
             config.ignoreMask = None
             maskImg = None   
         movingAvgImg = None
+        
         # Kick off video stream thread
-        if mjpeg:
-            thread = threading.Thread(target=readMjpegFrames, 
-                args=(logger, 
-                    frameBuf, 
-                    config.frameBufMax, 
-                    )
+
+        thread = threading.Thread(target=readMjpegFrames, 
+            args=(logger, 
+                frameBuf, 
+                config.frameBufMax, 
                 )
-        else:
-            thread = threading.Thread(target=readVidCapFrames, 
-                args=(logger, 
-                    frameBuf, 
-                    config.frameBufMax, 
-                    videoCapture,)
-                )
-                
+            )
         thread.start()
         
         
@@ -438,10 +308,15 @@ def main(PY3):
                                                                                               config.blackThreshold, 
                                                                                               config.maxChange, 
                                                                                               config.dilateAmount, 
-                                                                                              config.erodeAmount)
+                                                                                              config.erodeAmount,
+                                                                                              config.detectType,
+                                                                                              config.hitThreshold, 
+                                                                                              config.winStride,
+                                                                                              config.padding,
+                                                                                              config.scale0,
+                                                                                              config.minWeight
+                                                                                              )
 
-            
-            
             print("Processing done.")
             if config.historyImage:
                 # Update history image
@@ -465,9 +340,9 @@ def main(PY3):
                 if not os.path.exists(fileDir):
                     os.makedirs(fileDir)
                 recording = True
-            if config.mark:
+            #if config.mark:
                 # Draw rectangle around found objects
-                markRectSize(frame, movementLocations, widthMultiplier, heightMultiplier, (0, 255, 0), 2)
+                #markRectSize(frame, movementLocations, widthMultiplier, heightMultiplier, (0, 255, 0), 2)
             if config.saveFrames:
 
                 cv2.imwrite('/tmp/raw_frames/frame' + str(indx) + '.jpg', frame)
@@ -483,16 +358,13 @@ def main(PY3):
         # Exit video streaming thread
         frameOk = False
         # Clean up
-        if mjpeg:
-            pass
-        else:
-            del videoCapture
+
         if config.historyImage and fileDir is not None:
             # Save history image ready for ignore mask editing
             fileName = "%s.%s" % (now.strftime("%H-%M-%S"), 'png')
             logger.info("%s/%s.png" % (fileDir, fileName))
             cv2.imwrite("%s/%s.png" % (fileDir, fileName), cv2.bitwise_not(historyImg))
-            upload_result("%s/%s.png" % (fileDir, fileName), fileName)
+            upload_result("%s/%s.png" % (fileDir, fileName), 'mask.png')
                 
                 
         shutil.make_archive('/tmp/frame_zip', 'zip', '/tmp/frames')
@@ -510,15 +382,12 @@ if __name__ == '__main__':
     # prints whether python is version 3 or not
     python_version = sys.version_info.major
     PY3 = True
-    global UPLOAD, LOCAL
     if python_version == 3:
         print("is python 3")
         import configparser
-        import urllib.parse
     else:
         print("not python 3")
         import ConfigParser
-        import urlparse
         PY3 = False
     if len(sys.argv) > 1:
         for x in sys.argv[1:]:

@@ -49,7 +49,7 @@ if __name__ == '__main__':
     
     videoWriter = cv2.VideoWriter("%s/%s" % ('/tmp', 'video.avi'), 
                           cv2.VideoWriter_fourcc('X','V','I','D'), 
-                          3, 
+                          2, 
                           (frameResizeWidth*2, frameResizeHeight*3), 
                           True
                           )
