@@ -1,34 +1,13 @@
-"""
-Copyright (c) Steven P. Goldsmith. All rights reserved.
-
-Created by Steven P. Goldsmith on February 4, 2017
-sgoldsmith@codeferm.com
-"""
-
-"""Motion detector uses threading where possible to keep consistent FPS.
-
-Resizes frame, sampling and uses moving average to determine change percent. Inner
-rectangles are filtered out as well. This can result in better performance and
-a more stable ROI.
-
-Optional pedestrian detector using sampling, resize and motion ROI. Histogram of Oriented
-Gradients ([Dalal2005]) object detector is used. You can get up to 1200%
-performance boost using this method.
-
-Optional Haar Feature-based Cascade Classifier for Object Detection. The object detector
-was initially proposed by Paul Viola and improved by Rainer Lienhart.
-
-A frame buffer is used to record 1 second before motion threshold is triggered.
-
-sys.argv[1] = configuration file name or will default to "motiondetect.ini" if no args passed.
-
-@author: sgoldsmith
-
-"""
-
-import logging, sys, os, time, datetime, threading, numpy, cv2, mjpegclient, motiondet, redis, boto3
+import logging
+import os
+import time, datetime
+import numpy
+import threading
+import cv2
+import mjpegclient, motiondet
+import redis 
+import boto3
 from glob import glob
-import numpy as np
 import shutil
 import errno
 
@@ -43,33 +22,6 @@ def upload_result(path, filename):
     print("Uploading")
     s3 = boto3.client('s3')
     s3.upload_file(path, os.environ.get("S3_BUCKET"), '360_stream/data/' + filename)  
-
-
-
-
-def markRectSize(target, rects, widthMul, heightMul, boxColor, boxThickness):
-    """Mark rectangles in image"""
-    for x, y, w, h in rects:
-        # Calculate full size
-        x2 = x * widthMul
-        y2 = y * heightMul
-        w2 = w * widthMul
-        h2 = h * heightMul
-        # Mark target
-        cv2.rectangle(target, (x2, y2), (x2 + w2, y2 + h2), boxColor, boxThickness)
-        label = "%dx%d" % (w2, h2)
-        # Figure out text size
-        size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1.0, 1)[0]
-        # Deal with possible text outside of image bounds
-        if x2 < 0:
-            x2 = 0
-        if y2 < size[1]:
-            y2 = size[1] + 2
-        else:
-            y2 = y2 - 2
-        # Show width and height of full size image
-        cv2.putText(target, label, (x2, y2), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), thickness=1, lineType=cv2.LINE_AA)
-        
 
 
 def mkdir_p(path):
@@ -130,12 +82,8 @@ def config(parser):
     config.cameraName = parser.get("camera", "name")    
     config.socketTimeout = parser.getint("camera", "socketTimeout")
     config.resizeWidthDiv = parser.getint("camera", "resizeWidthDiv")
-    config.fpsInterval = parser.getfloat("camera", "fpsInterval")
-    config.fps = parser.getint("camera", "fps")
     config.frameBufMax = parser.getint("camera", "frameBufMax")
     config.fourcc = parser.get("camera", "fourcc")
-    config.recordFileExt = parser.get("camera", "recordFileExt")
-    config.recordDir = parser.get("camera", "recordDir")
     config.detectType = parser.get("camera", "detectType")
     config.mark = parser.getboolean("camera", "mark")
     config.saveFrames = parser.getboolean("camera", "saveFrames")
@@ -178,6 +126,7 @@ def main(PY3):
         parser = ConfigParser.SafeConfigParser()
     # Read configuration file
     parser.read(configFileName)
+    
     # Configure logger
     logger = logging.getLogger(__name__)
     logger.setLevel(parser.get("logging", "level"))
@@ -185,19 +134,18 @@ def main(PY3):
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    
     # Load values from ini file
     config(parser)
 
     # Initialize video
-
     print ("Waiting for initial frame...")
     frameWidth, frameHeight = initMjpegVideo()
-    fps = config.fps
     print ("Initial frame recieved. Synchronizing...")
 
         
     logger.info("OpenCV %s" % cv2.__version__)
-    logger.info("Stream: MJPEG, fps: %d" % fps)
+    logger.info("Stream: MJPEG")
     logger.info("Resolution: %dx%d" % (frameWidth, frameHeight))
     
     # Make sure we have values > 0
@@ -215,13 +163,9 @@ def main(PY3):
    
         # Frame buffer
         frameBuf = []
-        # History buffer to capture just before motion
-        historyBuf = []
-        recording = False
-        global frameOk
+        
         elapsedFrames = 0
         frameTotal = 0
-        fileDir = None
         if config.historyImage:
             # Create black history image
             historyImg = numpy.zeros((frameResizeHeight, frameResizeWidth), numpy.uint8)
@@ -246,51 +190,26 @@ def main(PY3):
         thread.start()
         
         
-        # Wait until buffer is full
-        print ("Waiting to fill buffer.. Preloading")
-        while((len(frameBuf) < fps) and (r.get('det_status').decode('utf-8') == 'GO')):
-            # 1/4 of FPS sleep
+        # Wait for base frame
+        print ("Waiting for first frame")
+        while((len(frameBuf) < 1) and (r.get('det_status').decode('utf-8') == 'GO')):
             time.sleep(1)     
-        print ("Buffer Filled. Beginning motion detection routine. \nContinue sending images. Use stop.py to signal stop")         
-        start = time.time()
-        appstart = start
+        print ("Initial frame recieved. Beginning motion detection routine. \nContinue sending images. Use stop.py to signal stop")         
         
         #mkdir_p('/tmp/raw_frames') 
         mkdir_p('/tmp/frames') 
         indx = 0
         # Loop as long as there are frames in the buffer
         while(len(frameBuf) > 0):
-            # Wait until frame buffer is full
-            while((len(frameBuf)) < fps and (r.get('det_status').decode('utf-8') == 'GO')):
-                # 1/4 of FPS sleep
-                time.sleep(1)
-            
             if r.get('det_status').decode('utf-8') == 'STOP':
                 print("Stop signal recieved. Clearing up buffer")
             
             # Get oldest frame
             frame = frameBuf[0][0]
-            # Used for timestamp in frame buffer and filename
-            now = frameBuf[0][1]
-            
-            
-            # Buffer oldest frame
-            historyBuf.append(frameBuf[0])
-            # Toss oldest history frame
-            if len(historyBuf) > fps:
-                historyBuf.pop(0)
+            print(str(frameBuf[0][1]))
             # Toss oldest frame
             frameBuf.pop(0)
             frameTotal += 1
-            # Calc FPS    
-            elapsedFrames += 1
-            curTime = time.time()
-            elapse = curTime - start
-            # Log FPS
-            if elapse >= config.fpsInterval:
-                start = curTime
-                logger.debug("%3.1f FPS, frame buffer size: %d" % (elapsedFrames / elapse, len(frameBuf)))
-                elapsedFrames = 0
 
             # Resize image if not the same size as the original
             if frameResizeWidth != frameWidth:
@@ -314,7 +233,10 @@ def main(PY3):
                                                                                               config.winStride,
                                                                                               config.padding,
                                                                                               config.scale0,
-                                                                                              config.minWeight
+                                                                                              config.minWeight,
+                                                                                              widthMultiplier,
+                                                                                              heightMultiplier,
+                                                                                              r
                                                                                               )
 
             print("Processing done.")
@@ -323,48 +245,28 @@ def main(PY3):
                 historyImg = numpy.bitwise_or(bwImg, historyImg)                    
             # Threshold to trigger motion
             
-            print("motion percent: " + str(motionPercent))
+            print("motion percent: " + str(motionPercent) + " frame count:" + str(frameTotal))
             
-            print(len(frameBuf))
-            print(len(historyBuf))
-
-            #if motionPercent >= config.maxChange:
-            #    skipCount = config.skipFrames
-            #    logger.debug("Maximum motion change: %4.2f" % motionPercent)
-            if not recording:
-
-                # Construct directory name from camera name, recordDir and date
-                dateStr = now.strftime("%Y-%m-%d")
-                fileDir = "%s/%s/%s" % (os.path.expanduser(config.recordDir), config.cameraName, dateStr)
-                # Create dir if it doesn"t exist
-                if not os.path.exists(fileDir):
-                    os.makedirs(fileDir)
-                recording = True
-            #if config.mark:
-                # Draw rectangle around found objects
-                #markRectSize(frame, movementLocations, widthMultiplier, heightMultiplier, (0, 255, 0), 2)
             if config.saveFrames:
 
                 cv2.imwrite('/tmp/raw_frames/frame' + str(indx) + '.jpg', frame)
 
                 indx = indx + 1
                     
-            print("Frame processed")        
-        
-        
-        
-        elapsed = time.time() - appstart
-        logger.info("Calculated %4.1f FPS, elapsed time: %4.2f seconds, frame total: %s" % (frameTotal / elapsed, elapsed, frameTotal))
+            print("Frame processed")    
+            while((len(frameBuf)) < 1 and (r.get('det_status').decode('utf-8') == 'GO')):
+                time.sleep(1)    
+                
+        print("Cleaning up, uploading data")
         # Exit video streaming thread
+        global frameOk
         frameOk = False
+        
         # Clean up
-
-        if config.historyImage and fileDir is not None:
+        if config.historyImage:
             # Save history image ready for ignore mask editing
-            fileName = "%s.%s" % (now.strftime("%H-%M-%S"), 'png')
-            logger.info("%s/%s.png" % (fileDir, fileName))
-            cv2.imwrite("%s/%s.png" % (fileDir, fileName), cv2.bitwise_not(historyImg))
-            upload_result("%s/%s.png" % (fileDir, fileName), 'mask.png')
+            cv2.imwrite("/tmp/mask.png", cv2.bitwise_not(historyImg))
+            upload_result("/tmp/mask.png", 'mask.png')
                 
                 
         shutil.make_archive('/tmp/frame_zip', 'zip', '/tmp/frames')

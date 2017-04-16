@@ -14,8 +14,7 @@ sgoldsmith@codeferm.com
 import numpy, cv2
 import os
 import pedestriandet
-
-
+import pickle
 
 
 def filterByWeight(foundLocsList, foundWghtsList, minWeight):
@@ -38,6 +37,10 @@ def filterByWeight(foundLocsList, foundWghtsList, minWeight):
     return filteredFoundLocations, filteredFoundWeights
 
 
+
+def restoreScale(loclist, widthMultiplier, heightMultiplier):
+    x = list(map(lambda x: (x[0] * widthMultiplier, x[1] * heightMultiplier, x[2] * widthMultiplier, x[3] * heightMultiplier), loclist))
+    return x
 
 
 def markRectWeight(target, locList, foundLocsList, foundWghtsList, boxColor, boxThickness):
@@ -113,13 +116,11 @@ def contours(image, dilateAmount, erodeAmount):
         rect = cv2.boundingRect(contour)
         movementLocations.append(rect)
     return movementLocations
+    
 indx = 0
-def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange, dilateAmount, erodeAmount, detectType, hitThreshold, winStride, padding, scale0, minWeight):
+def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange, dilateAmount, erodeAmount, detectType, hitThreshold, winStride, padding, scale0, minWeight, widthMultiplier, heightMultiplier, redis):
     global indx
-    """Detect motion"""
-    
-    
-    
+    """Detect motion""" 
     movementLocationsFiltered = []
     # Generate work image by blurring
     workImg = cv2.blur(image, kSize)
@@ -129,21 +130,16 @@ def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange
     # Generate moving average image
     cv2.accumulateWeighted(workImg, movingAvgImg, alpha)
     diffImg = cv2.absdiff(workImg, cv2.convertScaleAbs(movingAvgImg))
-    cv2.imwrite('/tmp/frames/imgd'+str(indx) + '.jpg', diffImg)
     # Convert to grayscale
     grayImg = cv2.cvtColor(diffImg, cv2.COLOR_BGR2GRAY)
-    cv2.imwrite('/tmp/frames/imgmaG'+str(indx) + '.jpg', grayImg)
     # Convert to BW
     ret, bwImg = cv2.threshold(grayImg, blackThreshold, 255, cv2.THRESH_BINARY)
-    cv2.imwrite('/tmp/frames/imgmaBW'+str(indx) + '.jpg', bwImg)
     # Apply ignore mask
     if maskImg is not None:
         bwImg = numpy.bitwise_and(bwImg, maskImg)     
     # Total number of changed motion pixels
     height, width, unknown = image.shape
     motionPercent = 100.0 * cv2.countNonZero(bwImg) / (width * height)
-    # Detect if camera is adjusting and reset reference if more than threshold
-
     movementLocations = contours(bwImg, dilateAmount, erodeAmount)
     
     # Filter out inside rectangles
@@ -182,12 +178,7 @@ def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange
                 # Save off detected elapsedFrames
                 print("Pedestrian detected locations: %s" % foundLocationsList)"""                
                 
-                
-                
-
-                
-                
-                
+       
     markRectSize(video_image, movementLocationsFiltered, (0, 255, 0), 2)
     markRectSize(workImg, movementLocationsFiltered, (0, 255, 0), 2)
     video_movingAvgImg = movingAvgImg.copy()
@@ -208,4 +199,8 @@ def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange
         movingAvgImg = numpy.float32(workImg)
     
     indx = indx + 1
+    
+    p_mydict = pickle.dumps(restoreScale(movementLocationsFiltered, widthMultiplier, heightMultiplier))
+    redis.set('DATA', p_mydict)
+    
     return movingAvgImg, grayImg, bwImg, motionPercent, movementLocationsFiltered

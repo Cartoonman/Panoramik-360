@@ -19,7 +19,7 @@ work the server did in identifying regions
 """    
 def upload_result(r, filename):
     s3 = boto3.client('s3')
-    s3.upload_file(filename, os.environ.get("S3_BUCKET"), '360_stream/stream.jpg')  
+    s3.upload_file(filename, os.environ.get("S3_BUCKET"), '360_stream/stream.jpg', {'ACL': 'public-read'})  
     r.set('det_ready', True)
     r.set('srv_ready', True)
 
@@ -79,8 +79,8 @@ def takePicture():
         print x
         upload_result(r,  x)
         print(r.get('det_ready').decode('utf-8'))
-        while r.get('det_ready').decode('utf-8') == "True":
-            time.sleep(1)
+        #while r.get('det_ready').decode('utf-8') == "True":
+        #    time.sleep(1)
               
     
 if __name__ == '__main__':
