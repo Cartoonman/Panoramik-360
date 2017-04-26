@@ -22,6 +22,10 @@ def upload_result(r, filename):
     r.set('det_ready', True)
     r.set('srv_ready', True)
 
+def upload_result2(filename):
+    s3 = boto3.client('s3')
+    s3.upload_file(filename, os.environ.get("S3_BUCKET"), '360_stream/thmbstream.jpg', {'ACL': 'public-read'})
+
 
 
 ## example of taking a picture
@@ -36,7 +40,13 @@ def takePicture():
 
 
         print ("Uploading")
-        upload_result(r,  "stream.jpg")
+        upload_result(r, "stream.jpg")
+        
+        img = cv2.imread('stream.jpg')   
+        cv2.resize(img, (400, 200), interpolation=cv2.INTER_NEAREST)
+        cv2.imwrite('thmbstream.jpg', img)
+        upload_result2('thmbstream.jpg')
+        
         print(r.get('det_ready').decode('utf-8'))
         while r.get('det_ready').decode('utf-8') == "True":
             time.sleep(5)
