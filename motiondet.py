@@ -106,8 +106,10 @@ def contours(image, dilateAmount, erodeAmount):
     """Return contours"""
     # The background (bright) dilates around the black regions of frame
     image = cv2.dilate(image, None, iterations=dilateAmount);
+    cv2.imwrite('/tmp/frames/imgDILATE'+str(indx) + '.jpg', image)
     # The bright areas of the image (the background, apparently), get thinner, whereas the dark zones bigger
     image = cv2.erode(image, None, iterations=erodeAmount);
+    cv2.imwrite('/tmp/frames/imgERODE'+str(indx) + '.jpg', image)
     # Find contours
     image, contours, heirarchy = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     # Add objects with motion

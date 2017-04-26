@@ -293,9 +293,9 @@ if __name__ == '__main__':
         PY3 = False
     if len(sys.argv) > 1:
         for x in sys.argv[1:]:
-            if x == 'upload':
+            if x.lower() == 'upload':
                 UPLOAD = True
-            if x == 'local':
+            if x.lower() == 'local':
                 LOCAL = True
 
     main(PY3)
