@@ -15,6 +15,7 @@ import numpy, cv2
 import os
 import pedestriandet
 import pickle
+import boto3
 
 
 def filterByWeight(foundLocsList, foundWghtsList, minWeight):
@@ -119,6 +120,16 @@ def contours(image, dilateAmount, erodeAmount):
         movementLocations.append(rect)
     return movementLocations
     
+    
+    
+def upload_result(filename, name):
+    s3 = boto3.client('s3')
+    s3.upload_file(filename, os.environ.get("S3_BUCKET"), '360_stream/' + name + '.jpg', {'ACL': 'public-read'})    
+    
+    
+    
+    
+    
 indx = 0
 def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange, dilateAmount, erodeAmount, detectType, hitThreshold, winStride, padding, scale0, minWeight, widthMultiplier, heightMultiplier, redis):
     global indx
@@ -196,6 +207,36 @@ def detect(movingAvgImg, maskImg, image, kSize, alpha, blackThreshold, maxChange
     cv2.imwrite('/tmp/frames/imgd'+str(indx) + '.jpg', diffImg)
     cv2.imwrite('/tmp/frames/imgmaG'+str(indx) + '.jpg', video_grayImg)
     cv2.imwrite('/tmp/frames/imgmaBW'+str(indx) + '.jpg', video_bwImg)
+    
+    cv2.resize(workImg, (400,200), interpolation=cv2.INTER_NEAREST)
+    cv2.resize(video_image, (400,200), interpolation=cv2.INTER_NEAREST)
+    cv2.resize(video_movingAvgImg, (400,200), interpolation=cv2.INTER_NEAREST)
+    cv2.resize(diffImg, (400,200), interpolation=cv2.INTER_NEAREST)
+    cv2.resize(video_grayImg, (400,200), interpolation=cv2.INTER_NEAREST)
+    cv2.resize(video_bwImg, (400,200), interpolation=cv2.INTER_NEAREST)
+    
+    
+    
+    cv2.imwrite('/tmp/1.jpg', workImg)
+    cv2.imwrite('/tmp/2.jpg', video_image)
+    cv2.imwrite('/tmp/3.jpg', video_movingAvgImg)
+    cv2.imwrite('/tmp/4.jpg', diffImg)
+    cv2.imwrite('/tmp/5.jpg', video_grayImg)
+    cv2.imwrite('/tmp/6.jpg', video_bwImg)
+    
+    
+    upload_result('/tmp/1.jpg', '1')
+    upload_result('/tmp/2.jpg', '2')
+    upload_result('/tmp/3.jpg', '3')
+    upload_result('/tmp/4.jpg', '4')
+    upload_result('/tmp/5.jpg', '5')
+    upload_result('/tmp/6.jpg', '6')
+    
+    
+    
+    
+    
+    
     # Detect if camera is adjusting and reset reference if more than threshold
     if motionPercent > maxChange:
         movingAvgImg = numpy.float32(workImg)

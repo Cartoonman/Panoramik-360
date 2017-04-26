@@ -3,29 +3,45 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
 <head>
 <body>
-<img id="img" style="width: 300px" src="https://s3.amazonaws.com/panoramik-ccny/360_stream/thmbstream.jpg"></img>
 <div id="div" style="width: 300px"></div>
 <script>
 
-setInterval(function() {
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function(){
-      if (this.readyState == 4 && this.status == 200){
-          console.log(this.response, typeof this.response);
-          var img = document.createElement('img');
-          var url = window.URL || window.webkitURL;
-          img.src = url.createObjectURL(this.response);
-          img.style.width = 300;
-          img.id = "img";
-          var div = document.getElementById('div');
-          $("#img").remove();
-          $("#div").append(img);
-        }
-    }
+var NUM = 3;
+var arr = []; // an arrary to store all callback functions
+var images = [
+    'https://s3.amazonaws.com/panoramik-ccny/360_stream/thmbstream.jpg',
+    'https://s3.amazonaws.com/panoramik-ccny/360_stream/1.jpg',
+    'https://s3.amazonaws.com/panoramik-ccny/360_stream/2.jpg'
+];
 
-    xhr.open('GET', 'https://s3.amazonaws.com/panoramik-ccny/360_stream/thmbstream.jpg');
-    xhr.responseType = 'blob';
-    xhr.send();  
+for (var i = 0; i <= NUM; i++) {
+    var f = (function(i) {
+        var a = function() {
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+              if (this.readyState == 4 && this.status == 200) {
+                  console.log("sdfs");
+                  var img = document.createElement('img');
+                  var url = window.URL || window.webkitURL;
+                  img.src = url.createObjectURL(this.response);
+                  img.style.width = 300;
+                  img.id = '' + i;
+                  $("#"+i).remove();
+                  $("#div").append(img);
+                }
+            }
+
+            xhr.open('GET', images[i]);
+            xhr.responseType = 'blob';
+            xhr.send();
+        };
+        return a;
+    })(i);
+    arr.push(f);
+}
+
+setInterval(function() {
+  arr.map(x=> x());
 }, 2000);
 
 
