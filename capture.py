@@ -10,6 +10,8 @@ import re
 import boto3
 import os
 import redis
+import PIL
+from PIL import Image
 
 
 """
@@ -41,10 +43,13 @@ def takePicture():
 
         print ("Uploading")
         upload_result(r, "stream.jpg")
-        
-        img = cv2.imread('stream.jpg')   
-        cv2.resize(img, (400, 200), interpolation=cv2.INTER_NEAREST)
-        cv2.imwrite('thmbstream.jpg', img)
+
+        basewidth = 400
+        img = Image.open('stream.jpg')
+        wpercent = (basewidth/float(img.size[0]))
+        hsize = int((float(img.size[1])*float(wpercent)))
+        img = img.resize((basewidth,hsize), PIL.Image.ANTIALIAS)
+        img.save('thmbstream.jpg') 
         upload_result2('thmbstream.jpg')
         
         print(r.get('det_ready').decode('utf-8'))
